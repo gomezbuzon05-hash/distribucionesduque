@@ -35,7 +35,7 @@ export const AppProvider = ({ children }) => {
       hora: fechaActual.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    // Solo escribimos en Firestore — onSnapshot se encarga de actualizar el estado
+    // Fire-and-forget — onSnapshot actualiza el estado
     addDocument('movimientos', nuevoMovimiento).catch(console.error);
   };
 
@@ -46,7 +46,11 @@ export const AppProvider = ({ children }) => {
   // ═══════════════════════════════════════════════════════════════════
   //  LISTENERS EN TIEMPO REAL CON onSnapshot
   //  Cada colección se suscribe una vez. Firestore notifica cualquier
-  //  cambio (local o remoto) y el estado de React se actualiza automáticamente.
+  //  cambio (local o remoto) y el estado de React se actualiza.
+  //
+  //  NOTA: Para las colecciones críticas de velocidad (mesas, productos)
+  //  usamos UI Optimista + onSnapshot. El estado local se actualiza
+  //  INMEDIATAMENTE y onSnapshot lo reconcilia después.
   // ═══════════════════════════════════════════════════════════════════
   useEffect(() => {
     const unsubscribers = [];
@@ -114,11 +118,13 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════
-  //  FUNCIONES DE MUTACIÓN
-  //  Ahora solo escriben en Firestore. Los onSnapshot se encargan
-  //  de reflejar los cambios en el estado de React automáticamente.
-  //  Ya no se necesitan actualizaciones manuales del estado local
-  //  (excepto donde se necesite lógica secuencial entre colecciones).
+  //  FUNCIONES DE MUTACIÓN — UI OPTIMISTA + FIRE-AND-FORGET
+  //
+  //  Estrategia: Actualizar el estado local PRIMERO (instantáneo),
+  //  luego disparar las escrituras a Firestore SIN esperar (no await).
+  //  onSnapshot reconcilia automáticamente cuando Firestore confirma.
+  //  Las escrituras paralelas (Promise.all) se usan donde hay
+  //  múltiples documentos que actualizar.
   // ═══════════════════════════════════════════════════════════════════
 
   const actualizarRolUsuario = async (userId, nuevoRol, nuevoEstado) => {
@@ -192,27 +198,33 @@ export const AppProvider = ({ children }) => {
     } catch(e) { console.error(e); }
   };
 
-  const abrirMesa = async (mesaId, titular) => {
+  const abrirMesa = (mesaId, titular) => {
     const mesaActualizada = { titular, estado: 'ocupada', productos: [], abonos: 0 };
-    try {
-      const mesaActual = mesasRef.current.find(m => m.id === mesaId);
-      await updateDocument('mesas', mesaId, mesaActualizada);
-      if (mesaActual) {
-        registrarMovimiento(`Abrió la mesa ${mesaActual.numero} para ${titular}`);
-      }
-    } catch(e) { console.error(e); }
+    const mesaActual = mesasRef.current.find(m => m.id === mesaId);
+
+    // ⚡ UI Optimista — actualización instantánea
+    setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, ...mesaActualizada } : m));
+
+    // 🔥 Fire-and-forget a Firestore
+    updateDocument('mesas', mesaId, mesaActualizada).catch(console.error);
+    if (mesaActual) {
+      registrarMovimiento(`Abrió la mesa ${mesaActual.numero} para ${titular}`);
+    }
   };
 
-  const abonarMesa = async (mesaId, monto) => {
+  const abonarMesa = (mesaId, monto) => {
     const mesa = mesasRef.current.find(m => m.id === mesaId);
     if (!mesa) return;
     const nuevoAbono = (mesa.abonos || 0) + monto;
-    try {
-      await updateDocument('mesas', mesaId, { abonos: nuevoAbono });
-    } catch(e) { console.error(e); }
+
+    // ⚡ UI Optimista
+    setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, abonos: nuevoAbono } : m));
+
+    // 🔥 Fire-and-forget
+    updateDocument('mesas', mesaId, { abonos: nuevoAbono }).catch(console.error);
   };
 
-  const agregarProductoAMesa = async (mesaId, producto) => {
+  const agregarProductoAMesa = (mesaId, producto) => {
     const prodActual = productosRef.current.find(p => p.id === producto.id);
     if (!prodActual || prodActual.stock <= 0) {
       alert('No hay stock disponible para este producto.');
@@ -231,14 +243,20 @@ export const AppProvider = ({ children }) => {
       nuevosProdsMesa.push({ productoId: producto.id, cantidad: 1 });
     }
 
-    try {
-      await updateDocument('productos', producto.id, { stock: nuevoStock });
-      await updateDocument('mesas', mesaId, { productos: nuevosProdsMesa });
-      registrarMovimiento(`Agregó el producto "${prodActual.nombre}" a la mesa ${mesaActual.numero}`);
-    } catch(e) { console.error(e); }
+    // ⚡ UI Optimista — el usuario ve el cambio INMEDIATAMENTE
+    setProductos(prev => prev.map(p => p.id === producto.id ? { ...p, stock: nuevoStock } : p));
+    setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, productos: nuevosProdsMesa } : m));
+
+    // 🔥 Fire-and-forget EN PARALELO — sin bloquear la UI
+    Promise.all([
+      updateDocument('productos', producto.id, { stock: nuevoStock }),
+      updateDocument('mesas', mesaId, { productos: nuevosProdsMesa })
+    ]).catch(console.error);
+
+    registrarMovimiento(`Agregó el producto "${prodActual.nombre}" a la mesa ${mesaActual.numero}`);
   };
 
-  const actualizarCantidadProductoMesa = async (mesaId, productoId, cambio) => {
+  const actualizarCantidadProductoMesa = (mesaId, productoId, cambio) => {
     const mesa = mesasRef.current.find(m => m.id === mesaId);
     if (!mesa) return;
 
@@ -252,11 +270,18 @@ export const AppProvider = ({ children }) => {
         const nuevosProdsMesa = mesa.productos.map(p =>
           p.productoId === productoId ? { ...p, cantidad: p.cantidad + 1 } : { ...p }
         );
-        try {
-          await updateDocument('productos', productoId, { stock: nuevoStock });
-          await updateDocument('mesas', mesaId, { productos: nuevosProdsMesa });
-          registrarMovimiento(`Aumentó cantidad de "${prodActual.nombre}" en la mesa ${mesa.numero}`);
-        } catch(e) { console.error(e); }
+
+        // ⚡ UI Optimista
+        setProductos(prev => prev.map(p => p.id === productoId ? { ...p, stock: nuevoStock } : p));
+        setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, productos: nuevosProdsMesa } : m));
+
+        // 🔥 Fire-and-forget EN PARALELO
+        Promise.all([
+          updateDocument('productos', productoId, { stock: nuevoStock }),
+          updateDocument('mesas', mesaId, { productos: nuevosProdsMesa })
+        ]).catch(console.error);
+
+        registrarMovimiento(`Aumentó cantidad de "${prodActual.nombre}" en la mesa ${mesa.numero}`);
       } else {
         alert('No hay suficiente stock de este producto.');
       }
@@ -266,16 +291,23 @@ export const AppProvider = ({ children }) => {
         const nuevosProdsMesa = mesa.productos
           .map(p => p.productoId === productoId ? { ...p, cantidad: p.cantidad - 1 } : { ...p })
           .filter(p => p.cantidad > 0);
-        try {
-          await updateDocument('productos', productoId, { stock: nuevoStock });
-          await updateDocument('mesas', mesaId, { productos: nuevosProdsMesa });
-          registrarMovimiento(`Redujo cantidad de "${prodActual.nombre}" en la mesa ${mesa.numero}`);
-        } catch(e) { console.error(e); }
+
+        // ⚡ UI Optimista
+        setProductos(prev => prev.map(p => p.id === productoId ? { ...p, stock: nuevoStock } : p));
+        setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, productos: nuevosProdsMesa } : m));
+
+        // 🔥 Fire-and-forget EN PARALELO
+        Promise.all([
+          updateDocument('productos', productoId, { stock: nuevoStock }),
+          updateDocument('mesas', mesaId, { productos: nuevosProdsMesa })
+        ]).catch(console.error);
+
+        registrarMovimiento(`Redujo cantidad de "${prodActual.nombre}" en la mesa ${mesa.numero}`);
       }
     }
   };
 
-  const cerrarMesa = async (mesaId, metodoPago = 'Efectivo') => {
+  const cerrarMesa = (mesaId, metodoPago = 'Efectivo') => {
     const mesa = mesasRef.current.find(m => m.id === mesaId);
     if (!mesa) return;
 
@@ -301,11 +333,17 @@ export const AppProvider = ({ children }) => {
 
     const mesaReset = { titular: '', estado: 'desocupada', productos: [], abonos: 0 };
 
-    try {
-      await addDocument('mesasCerradas', mesaCerrada);
-      await updateDocument('mesas', mesaId, mesaReset);
-      registrarMovimiento(`Cerró la mesa ${mesa.numero}`);
-    } catch(e) { console.error(e); }
+    // ⚡ UI Optimista — la mesa se libera al instante
+    setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, ...mesaReset } : m));
+    setMesasCerradas(prev => [{ id: 'temp-' + Date.now(), ...mesaCerrada }, ...prev]);
+
+    // 🔥 Fire-and-forget EN PARALELO
+    Promise.all([
+      addDocument('mesasCerradas', mesaCerrada),
+      updateDocument('mesas', mesaId, mesaReset)
+    ]).catch(console.error);
+
+    registrarMovimiento(`Cerró la mesa ${mesa.numero}`);
   };
 
   // ── Pedidos ────────────────────────────────────────────────────────
@@ -317,7 +355,9 @@ export const AppProvider = ({ children }) => {
       const prodActual = productosRef.current.find(p => p.id === pedidoNuevo.productoId);
       if (prodActual) {
         const nuevoStock = Number(prodActual.stock) + Number(pedidoNuevo.cantidad);
-        await updateDocument('productos', prodActual.id, { stock: nuevoStock });
+        // UI Optimista para stock
+        setProductos(prev => prev.map(p => p.id === prodActual.id ? { ...p, stock: nuevoStock } : p));
+        updateDocument('productos', prodActual.id, { stock: nuevoStock }).catch(console.error);
         pedidoNuevo.stockSumado = true;
       }
     }
@@ -339,7 +379,9 @@ export const AppProvider = ({ children }) => {
       const prodActual = productosRef.current.find(p => p.id === pedidoUpdate.productoId);
       if (prodActual) {
         const nuevoStock = Number(prodActual.stock) + Number(pedidoUpdate.cantidad);
-        await updateDocument('productos', prodActual.id, { stock: nuevoStock });
+        // UI Optimista para stock
+        setProductos(prev => prev.map(p => p.id === prodActual.id ? { ...p, stock: nuevoStock } : p));
+        updateDocument('productos', prodActual.id, { stock: nuevoStock }).catch(console.error);
         pedidoUpdate.stockSumado = true;
       }
     }
