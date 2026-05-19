@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import { Plus, X, Search, Edit2, Trash2, AlertTriangle } from 'lucide-react';
+import PageTransition from '../components/PageTransition';
 
 const Productos = ({ userData }) => {
   const { productos, agregarProducto, editarProducto, eliminarProducto, categorias } = useContext(AppContext);
@@ -72,7 +73,7 @@ const Productos = ({ userData }) => {
   };
 
   return (
-    <div>
+    <PageTransition>
       <div className="page-header">
         <div>
           <h1 className="page-title">Productos</h1>
@@ -276,7 +277,7 @@ const Productos = ({ userData }) => {
           </div>
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 };
 

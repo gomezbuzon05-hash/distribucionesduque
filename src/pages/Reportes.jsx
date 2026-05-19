@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import { Folder, ChevronDown, FileText, TrendingUp, Eye, X } from 'lucide-react';
+import PageTransition from '../components/PageTransition';
 
 const Reportes = () => {
   const { mesasCerradas } = useContext(AppContext);
@@ -88,7 +89,7 @@ const Reportes = () => {
   const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
   return (
-    <div>
+    <PageTransition>
       <div className="reportes-header">
         <div>
           <h1 className="page-title">Reportes</h1>
@@ -260,7 +261,7 @@ const Reportes = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 };
 

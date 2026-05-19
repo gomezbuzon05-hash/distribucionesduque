@@ -2,6 +2,7 @@
 import React, { useContext } from 'react';
 import { AppContext } from '../context/AppContext';
 import { User, Check, X, ShieldAlert, ShieldCheck, UserCog } from 'lucide-react';
+import PageTransition from '../components/PageTransition';
 
 const Empleados = () => {
   const { usuarios, actualizarRolUsuario } = useContext(AppContext);
@@ -23,7 +24,7 @@ const Empleados = () => {
   };
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+    <PageTransition>
       <div className="page-header" style={{ marginBottom: '24px' }}>
         <div>
           <h1 className="page-title">Gestión de Empleados</h1>
@@ -145,7 +146,7 @@ const Empleados = () => {
           </div>
         </div>
       </div>
-    </div>
+    </PageTransition>
   );
 };
 

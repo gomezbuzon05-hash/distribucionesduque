@@ -1,12 +1,13 @@
 import React, { useContext } from 'react';
 import { AppContext } from '../context/AppContext';
 import { Activity, Clock, Calendar, User } from 'lucide-react';
+import PageTransition from '../components/PageTransition';
 
 const Movimientos = () => {
   const { movimientos } = useContext(AppContext);
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+    <PageTransition>
       <div className="page-header" style={{ marginBottom: '24px' }}>
         <div>
           <h1 className="page-title">Movimientos</h1>
@@ -80,7 +81,7 @@ const Movimientos = () => {
           </table>
         </div>
       </div>
-    </div>
+    </PageTransition>
   );
 };
 

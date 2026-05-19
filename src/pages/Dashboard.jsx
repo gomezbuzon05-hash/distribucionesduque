@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { AppContext } from '../context/AppContext';
 import { DollarSign, Users, ShoppingBag, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import PageTransition from '../components/PageTransition';
 
 const Dashboard = () => {
   const { mesasCerradas } = useContext(AppContext);
@@ -39,7 +40,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div>
+    <PageTransition>
       <div className="page-header">
         <div>
           <h1 className="page-title">Dashboard</h1>
@@ -163,7 +164,7 @@ const Dashboard = () => {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageTransition>
   );
 };
 

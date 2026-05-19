@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import { Plus, X, Search, Minus, Armchair, CheckCircle, User } from 'lucide-react';
+import PageTransition from '../components/PageTransition';
 
 const Mesas = () => {
   const { 
@@ -84,7 +85,7 @@ const Mesas = () => {
   );
 
   return (
-    <div>
+    <PageTransition>
       <div className="page-header">
         <div>
           <h1 className="page-title">Mesas</h1>
@@ -398,7 +399,7 @@ const Mesas = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 };
 
