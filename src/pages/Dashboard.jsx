@@ -14,6 +14,25 @@ const Dashboard = () => {
   const gananciasHoy = mesasDeHoy.reduce((sum, m) => sum + m.total, 0);
   const totalProductosVendidos = mesasDeHoy.reduce((sum, m) => sum + m.productosConsumidos, 0);
 
+  // Calcular inicio (Lunes) y fin (Domingo) de la semana actual
+  const ahora = new Date();
+  const diaSemana = ahora.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+  const diffLunes = diaSemana === 0 ? -6 : 1 - diaSemana;
+  
+  const inicioSemana = new Date(ahora);
+  inicioSemana.setDate(ahora.getDate() + diffLunes);
+  inicioSemana.setHours(0, 0, 0, 0);
+
+  const finSemana = new Date(inicioSemana);
+  finSemana.setDate(inicioSemana.getDate() + 6);
+  finSemana.setHours(23, 59, 59, 999);
+
+  // Filtrar solo mesas de la semana actual
+  const mesasSemana = mesasCerradas.filter(m => {
+    const fecha = new Date(m.fecha);
+    return fecha >= inicioSemana && fecha <= finSemana;
+  });
+
   // Datos para gráfica dinámicos
   const chartData = [
     { name: 'Lun', ganancias: 0 },
@@ -25,7 +44,7 @@ const Dashboard = () => {
     { name: 'Dom', ganancias: 0 }
   ];
 
-  mesasCerradas.forEach(mesa => {
+  mesasSemana.forEach(mesa => {
     const date = new Date(mesa.fecha);
     const day = date.getDay(); // 0 es Domingo
     const index = day === 0 ? 6 : day - 1;
@@ -33,6 +52,14 @@ const Dashboard = () => {
   });
 
   const totalSemana = chartData.reduce((sum, d) => sum + d.ganancias, 0);
+
+  // Formato de rango de fechas para el subtítulo
+  const formatRangoSemana = () => {
+    const opcion = { day: 'numeric', month: 'short' };
+    const inicio = inicioSemana.toLocaleDateString('es-ES', opcion);
+    const fin = finSemana.toLocaleDateString('es-ES', { ...opcion, year: 'numeric' });
+    return `${inicio} – ${fin}`;
+  };
 
   const formatDate = () => {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -89,7 +116,7 @@ const Dashboard = () => {
           Ingresos por semana
         </h3>
         <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24, marginLeft: 28 }}>
-          Semana actual - Total: <span style={{ color: 'var(--primary)', fontWeight: 600 }}>$ {totalSemana.toLocaleString('es-ES')}</span>
+          {formatRangoSemana()} · Total: <span style={{ color: 'var(--primary)', fontWeight: 600 }}>$ {totalSemana.toLocaleString('es-ES')}</span>
         </p>
         <div style={{ height: 300, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
