@@ -1,11 +1,16 @@
 
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
-import { User, Check, X, ShieldAlert, ShieldCheck, UserCog } from 'lucide-react';
+import { User, Check, X, ShieldAlert, ShieldCheck, UserCog, Lock } from 'lucide-react';
 import PageTransition from '../components/PageTransition';
+
+const CODIGO_VERIFICACION = '7415';
 
 const Empleados = () => {
   const { usuarios, actualizarRolUsuario } = useContext(AppContext);
+  const [autenticado, setAutenticado] = useState(false);
+  const [codigoInput, setCodigoInput] = useState('');
+  const [codigoError, setCodigoError] = useState(false);
 
   const pendientes = usuarios.filter(u => u.estado === 'pendiente');
   const activos = usuarios.filter(u => u.estado === 'aprobado');
@@ -22,6 +27,86 @@ const Empleados = () => {
   const handleChangeRol = (id, nuevoRol) => {
     actualizarRolUsuario(id, nuevoRol, 'aprobado');
   };
+
+  const handleVerificar = () => {
+    if (codigoInput === CODIGO_VERIFICACION) {
+      setAutenticado(true);
+      setCodigoError(false);
+    } else {
+      setCodigoError(true);
+    }
+  };
+
+  // Si no está autenticado, mostrar la pantalla de verificación
+  if (!autenticado) {
+    return (
+      <PageTransition>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 120px)',
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '16px',
+            padding: '48px 40px',
+            maxWidth: '420px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{
+              width: '64px', height: '64px',
+              backgroundColor: 'rgba(255, 170, 0, 0.1)',
+              color: 'var(--primary)',
+              borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 20px'
+            }}>
+              <Lock size={28} />
+            </div>
+            <h2 style={{ marginBottom: '8px', fontSize: '22px', color: 'var(--text-main)' }}>
+              Acceso Restringido
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.5', marginBottom: '28px' }}>
+              Ingresa el código de verificación para acceder a la gestión de empleados.
+            </p>
+            <div style={{ marginBottom: '24px' }}>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="Código de verificación"
+                value={codigoInput}
+                onChange={(e) => { setCodigoInput(e.target.value); setCodigoError(false); }}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerificar()}
+                autoFocus
+                style={{
+                  textAlign: 'center',
+                  fontSize: '20px',
+                  letterSpacing: '8px',
+                  borderColor: codigoError ? '#ff5252' : 'var(--border-color)'
+                }}
+              />
+              {codigoError && (
+                <p style={{ color: '#ff5252', fontSize: '13px', marginTop: '8px' }}>
+                  Código incorrecto. Intenta de nuevo.
+                </p>
+              )}
+            </div>
+            <button
+              className="btn-primary"
+              onClick={handleVerificar}
+              style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '15px' }}
+            >
+              Verificar Acceso
+            </button>
+          </div>
+        </div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>
@@ -66,15 +151,15 @@ const Empleados = () => {
                       </td>
                       <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button 
-                            className="btn-primary" 
+                          <button
+                            className="btn-primary"
                             style={{ backgroundColor: '#10b981', padding: '6px 12px', fontSize: '13px' }}
                             onClick={() => handleAprobar(usuario.id)}
                           >
                             <Check size={16} style={{ marginRight: '4px' }} /> Aprobar
                           </button>
-                          <button 
-                            className="btn-danger" 
+                          <button
+                            className="btn-danger"
                             style={{ padding: '6px 12px', fontSize: '13px' }}
                             onClick={() => handleRechazar(usuario.id)}
                           >
@@ -120,7 +205,7 @@ const Empleados = () => {
                     </td>
                     <td style={{ padding: '16px 24px', color: 'var(--text-muted)' }}>{usuario.email}</td>
                     <td style={{ padding: '16px 24px' }}>
-                      <span className={`badge-categoria`} style={{ 
+                      <span className={`badge-categoria`} style={{
                         backgroundColor: usuario.rol === 'SuperAdministrador' ? 'rgba(139, 92, 246, 0.2)' : usuario.rol === 'Administrador' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.1)',
                         color: usuario.rol === 'SuperAdministrador' ? '#a78bfa' : usuario.rol === 'Administrador' ? '#38bdf8' : '#e2e8f0'
                       }}>
@@ -128,8 +213,8 @@ const Empleados = () => {
                       </span>
                     </td>
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                      <select 
-                        className="form-control" 
+                      <select
+                        className="form-control"
                         style={{ padding: '6px 10px', fontSize: '13px', width: 'auto', display: 'inline-block' }}
                         value={usuario.rol}
                         onChange={(e) => handleChangeRol(usuario.id, e.target.value)}
