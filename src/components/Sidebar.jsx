@@ -72,11 +72,14 @@ const Sidebar = ({ userData }) => {
                 <FileText size={20} />
                 Reportes
               </NavLink>
-              <NavLink to="/movimientos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
-                <Activity size={20} />
-                Movimientos
-              </NavLink>
             </>
+          )}
+
+          {userData?.rol === 'SuperAdministrador' && (
+            <NavLink to="/movimientos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+              <Activity size={20} />
+              Movimientos
+            </NavLink>
           )}
 
           {userData?.rol === 'SuperAdministrador' && (

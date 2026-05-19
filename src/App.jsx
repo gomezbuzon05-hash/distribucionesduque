@@ -113,8 +113,11 @@ function App() {
                 <>
                   <Route path="pedidos" element={<Pedidos />} />
                   <Route path="reportes" element={<Reportes />} />
-                  <Route path="movimientos" element={<Movimientos />} />
                 </>
+              )}
+
+              {userData.rol === 'SuperAdministrador' && (
+                <Route path="movimientos" element={<Movimientos />} />
               )}
               
               {userData.rol === 'SuperAdministrador' && (
