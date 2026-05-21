@@ -191,7 +191,7 @@ export const AppProvider = ({ children }) => {
 
   // ── Mesas ──────────────────────────────────────────────────────────
   const agregarMesa = async (numero) => {
-    const nuevaMesa = { numero, titular: '', estado: 'desocupada', productos: [], abonos: 0 };
+    const nuevaMesa = { numero, titular: '', estado: 'desocupada', productos: [], abonos: 0, mesasHijas: [], mesaPadreId: null };
     try {
       await addDocument('mesas', nuevaMesa);
       registrarMovimiento(`Agregó la mesa ${numero}`);
@@ -199,7 +199,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const abrirMesa = (mesaId, titular) => {
-    const mesaActualizada = { titular, estado: 'ocupada', productos: [], abonos: 0 };
+    const mesaActualizada = { titular, estado: 'ocupada', productos: [], abonos: 0, mesasHijas: [], mesaPadreId: null };
     const mesaActual = mesasRef.current.find(m => m.id === mesaId);
 
     // ⚡ UI Optimista — actualización instantánea
@@ -331,19 +331,155 @@ export const AppProvider = ({ children }) => {
       metodoPago
     };
 
-    const mesaReset = { titular: '', estado: 'desocupada', productos: [], abonos: 0 };
+    const mesaReset = { titular: '', estado: 'desocupada', productos: [], abonos: 0, mesasHijas: [], mesaPadreId: null };
 
     // ⚡ UI Optimista — la mesa se libera al instante
-    setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, ...mesaReset } : m));
+    let mesasActualizadasOptimista = mesasRef.current.map(m => m.id === mesaId ? { ...m, ...mesaReset } : m);
+    
+    const promesasCierre = [
+      addDocument('mesasCerradas', mesaCerrada),
+      updateDocument('mesas', mesaId, mesaReset)
+    ];
+
+    if (mesa.mesasHijas && mesa.mesasHijas.length > 0) {
+      mesa.mesasHijas.forEach(hijaId => {
+         mesasActualizadasOptimista = mesasActualizadasOptimista.map(m => m.id === hijaId ? { ...m, ...mesaReset } : m);
+         promesasCierre.push(updateDocument('mesas', hijaId, mesaReset));
+      });
+    }
+
+    setMesas(mesasActualizadasOptimista);
     setMesasCerradas(prev => [{ id: 'temp-' + Date.now(), ...mesaCerrada }, ...prev]);
 
     // 🔥 Fire-and-forget EN PARALELO
-    Promise.all([
-      addDocument('mesasCerradas', mesaCerrada),
-      updateDocument('mesas', mesaId, mesaReset)
-    ]).catch(console.error);
+    Promise.all(promesasCierre).catch(console.error);
 
     registrarMovimiento(`Cerró la mesa ${mesa.numero}`);
+  };
+
+  const unirMesas = (mesaPrincipalId, mesasSecundariasIds) => {
+    const mesaPrincipal = mesasRef.current.find(m => m.id === mesaPrincipalId);
+    if (!mesaPrincipal) return;
+
+    let productosExtra = [...(mesaPrincipal.productos || [])];
+    let abonosExtra = mesaPrincipal.abonos || 0;
+    
+    const promesas = [];
+    const numerosMesasSecundarias = [];
+
+    mesasSecundariasIds.forEach(id => {
+      const mesaSec = mesasRef.current.find(m => m.id === id);
+      if (mesaSec) {
+        numerosMesasSecundarias.push(mesaSec.numero);
+        // Combinar productos
+        if (mesaSec.productos) {
+          mesaSec.productos.forEach(pSec => {
+            const idx = productosExtra.findIndex(p => p.productoId === pSec.productoId);
+            if (idx >= 0) {
+              productosExtra[idx].cantidad += pSec.cantidad;
+            } else {
+              productosExtra.push({ ...pSec });
+            }
+          });
+        }
+        // Combinar abonos
+        abonosExtra += (mesaSec.abonos || 0);
+
+        // Actualizar mesa secundaria
+        const updateSec = { estado: 'unida', mesaPadreId: mesaPrincipalId, productos: [], abonos: 0, titular: `Unida a Mesa ${mesaPrincipal.numero}` };
+        setMesas(prev => prev.map(m => m.id === id ? { ...m, ...updateSec } : m));
+        promesas.push(updateDocument('mesas', id, updateSec));
+      }
+    });
+
+    const hijasPrevias = mesaPrincipal.mesasHijas || [];
+    const nuevasHijas = [...new Set([...hijasPrevias, ...mesasSecundariasIds])];
+
+    const updatePrincipal = { 
+      productos: productosExtra, 
+      abonos: abonosExtra,
+      mesasHijas: nuevasHijas
+    };
+
+    setMesas(prev => prev.map(m => m.id === mesaPrincipalId ? { ...m, ...updatePrincipal } : m));
+    promesas.push(updateDocument('mesas', mesaPrincipalId, updatePrincipal));
+
+    Promise.all(promesas).catch(console.error);
+    registrarMovimiento(`Unió mesas ${numerosMesasSecundarias.join(', ')} a la mesa ${mesaPrincipal.numero}`);
+    mostrarToast('Mesas unidas correctamente', 'success');
+  };
+
+  const desvincularMesa = (mesaSecundariaId) => {
+    const mesaSec = mesasRef.current.find(m => m.id === mesaSecundariaId);
+    if (!mesaSec || !mesaSec.mesaPadreId) return;
+
+    const mesaPrincipalId = mesaSec.mesaPadreId;
+    const mesaPrincipal = mesasRef.current.find(m => m.id === mesaPrincipalId);
+
+    const updateSec = { estado: 'desocupada', mesaPadreId: null, titular: '', mesasHijas: [] };
+    setMesas(prev => prev.map(m => m.id === mesaSecundariaId ? { ...m, ...updateSec } : m));
+    
+    const promesas = [updateDocument('mesas', mesaSecundariaId, updateSec)];
+
+    if (mesaPrincipal) {
+      const nuevasHijas = (mesaPrincipal.mesasHijas || []).filter(id => id !== mesaSecundariaId);
+      setMesas(prev => prev.map(m => m.id === mesaPrincipalId ? { ...m, mesasHijas: nuevasHijas } : m));
+      promesas.push(updateDocument('mesas', mesaPrincipalId, { mesasHijas: nuevasHijas }));
+    }
+
+    Promise.all(promesas).catch(console.error);
+    mostrarToast('Mesa desvinculada', 'info');
+  };
+
+  const cobrarParcialMesa = (mesaId, productosAcobrar, metodoPago = 'Efectivo') => {
+    const mesa = mesasRef.current.find(m => m.id === mesaId);
+    if (!mesa) return;
+
+    let totalParcial = 0;
+    let cantProductosParcial = 0;
+    
+    // Calcular el total y actualizar los productos de la mesa
+    const nuevosProductosMesa = mesa.productos.map(p => ({...p}));
+    
+    productosAcobrar.forEach(pCobrar => {
+      const prod = productosRef.current.find(prod => prod.id === pCobrar.productoId);
+      if (prod) {
+        totalParcial += prod.precio * pCobrar.cantidadCobrar;
+        cantProductosParcial += pCobrar.cantidadCobrar;
+        
+        const idx = nuevosProductosMesa.findIndex(p => p.productoId === pCobrar.productoId);
+        if (idx >= 0) {
+          nuevosProductosMesa[idx].cantidad -= pCobrar.cantidadCobrar;
+        }
+      }
+    });
+
+    // Filtrar los que quedaron en 0
+    const productosFinales = nuevosProductosMesa.filter(p => p.cantidad > 0);
+
+    const ticketParcial = {
+      numero: mesa.numero,
+      titular: mesa.titular + ' (Pago Parcial)',
+      productosConsumidos: cantProductosParcial,
+      total: totalParcial,
+      horaCierre: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      fecha: new Date().toISOString(),
+      metodoPago,
+      esParcial: true
+    };
+
+    // ⚡ UI Optimista
+    setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, productos: productosFinales } : m));
+    setMesasCerradas(prev => [{ id: 'temp-' + Date.now(), ...ticketParcial }, ...prev]);
+
+    // 🔥 Fire-and-forget EN PARALELO
+    Promise.all([
+      addDocument('mesasCerradas', ticketParcial),
+      updateDocument('mesas', mesaId, { productos: productosFinales })
+    ]).catch(console.error);
+
+    registrarMovimiento(`Cobro parcial en mesa ${mesa.numero} por $${totalParcial}`);
+    mostrarToast(`Cobro parcial exitoso: $${totalParcial.toLocaleString()}`, 'success');
   };
 
   // ── Pedidos ────────────────────────────────────────────────────────
@@ -408,6 +544,7 @@ export const AppProvider = ({ children }) => {
       productos, agregarProducto, editarProducto, eliminarProducto,
       categorias, agregarCategoria, editarCategoria, eliminarCategoria,
       mesas, agregarMesa, abrirMesa, abonarMesa, agregarProductoAMesa, actualizarCantidadProductoMesa, cerrarMesa,
+      unirMesas, desvincularMesa, cobrarParcialMesa,
       mesasCerradas,
       pedidos, agregarPedido, editarPedido, eliminarPedido,
       movimientos,
