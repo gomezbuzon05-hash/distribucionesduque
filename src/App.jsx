@@ -13,6 +13,7 @@ import Reportes from './pages/Reportes';
 import Pedidos from './pages/Pedidos';
 import Movimientos from './pages/Movimientos';
 import Empleados from './pages/Empleados';
+import Ordenes from './pages/Ordenes';
 import Login from './pages/Login';
 import barBg from './assets/bar_bg.png';
 
@@ -109,7 +110,8 @@ function App() {
               <Route path="productos" element={<Productos userData={userData} />} />
               <Route path="categorias" element={<Categorias userData={userData} />} />
               
-              {userData.rol !== 'Usuario' && (
+              {userData.rol !== 'Usuario' && <Route path="ordenes" element={<Ordenes />} />}
+              {userData.rol === 'SuperAdministrador' && (
                 <>
                   <Route path="pedidos" element={<Pedidos />} />
                   <Route path="reportes" element={<Reportes />} />

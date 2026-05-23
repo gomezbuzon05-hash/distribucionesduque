@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Grid, Package, Tags, FileText, LogOut, Truck, Activity, Menu, X, Users } from 'lucide-react';
+import { LayoutDashboard, Grid, Package, Tags, FileText, LogOut, Truck, Activity, Menu, X, Users, ClipboardList } from 'lucide-react';
 import { auth } from '../firebase/firebase';
 import { signOut } from 'firebase/auth';
+import { AppContext } from '../context/AppContext';
 
 const Sidebar = ({ userData }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { ordenesMesas } = useContext(AppContext);
+  const pendingOrdersCount = ordenesMesas?.filter(o => o.estado === 'pendiente').length || 0;
   const closeSidebar = () => setIsOpen(false);
   const handleLogout = async () => {
     try {
@@ -63,6 +66,17 @@ const Sidebar = ({ userData }) => {
           </NavLink>
           
           {userData?.rol !== 'Usuario' && (
+            <NavLink to="/ordenes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+              <ClipboardList size={20} />
+              <span style={{ flex: 1 }}>Órdenes</span>
+              {pendingOrdersCount > 0 && (
+                <span style={{ backgroundColor: '#f97316', color: '#fff', borderRadius: '12px', padding: '2px 8px', fontSize: '12px', fontWeight: 'bold' }}>
+                  {pendingOrdersCount}
+                </span>
+              )}
+            </NavLink>
+          )}
+          {userData?.rol === 'SuperAdministrador' && (
             <>
               <NavLink to="/pedidos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
                 <Truck size={20} />

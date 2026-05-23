@@ -55,7 +55,7 @@ const Categorias = ({ userData }) => {
           <h1 className="page-title">Categorías</h1>
           <p className="page-subtitle">{categorias.length} categorías registradas</p>
         </div>
-        {userData?.rol !== 'Usuario' && (
+        {userData?.rol === 'SuperAdministrador' && (
           <button className="btn-primary" onClick={abrirModalNuevo}>
             <Plus size={18} />
             Nueva Categoría
@@ -90,7 +90,7 @@ const Categorias = ({ userData }) => {
                     </span>
                   </td>
                   <td style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    {userData?.rol !== 'Usuario' && (
+                    {userData?.rol === 'SuperAdministrador' && (
                       <>
                         <button className="btn-icon" onClick={() => abrirModalEditar(categoria)} title="Editar">
                           <Edit2 size={18} />

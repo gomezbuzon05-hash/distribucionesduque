@@ -79,7 +79,7 @@ const Productos = ({ userData }) => {
           <h1 className="page-title">Productos</h1>
           <p className="page-subtitle">Gestiona el inventario de tu local • <span className="num_productos">{productos.length}</span> productos en total</p>
         </div>
-        {userData?.rol !== 'Usuario' && (
+        {userData?.rol === 'SuperAdministrador' && (
           <button className="btn-primary" onClick={abrirModalNuevo}>
             <Plus size={18} />
             Nuevo Producto
@@ -146,7 +146,7 @@ const Productos = ({ userData }) => {
                 </td>
                 <td className="table-price">${producto.precio.toLocaleString()}</td>
                 <td style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                  {userData?.rol !== 'Usuario' && (
+                  {userData?.rol === 'SuperAdministrador' && (
                     <>
                       <button className="btn-icon" onClick={() => abrirModalEditar(producto)} title="Editar">
                         <Edit2 size={18} />

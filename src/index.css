@@ -801,6 +801,97 @@ body {
   margin-bottom: 32px;
 }
 
+/* Receipt Card (Factura) */
+.receipt-card {
+  background: #ffffff;
+  color: #000000;
+  border-radius: 4px;
+  position: relative;
+  padding: 32px 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  font-family: monospace;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+/* Jagged top edge */
+.receipt-card::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background-image: 
+    linear-gradient(135deg, #ffffff 25%, transparent 25%), 
+    linear-gradient(225deg, #ffffff 25%, transparent 25%);
+  background-size: 16px 16px;
+  background-position: 0 0;
+}
+
+/* Jagged bottom edge (optional, pero da buen toque) */
+.receipt-card::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background-image: 
+    linear-gradient(45deg, #ffffff 25%, transparent 25%), 
+    linear-gradient(-45deg, #ffffff 25%, transparent 25%);
+  background-size: 16px 16px;
+  background-position: 0 0;
+}
+
+.receipt-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.receipt-header h2 {
+  font-size: 24px;
+  font-family: var(--font-family);
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.receipt-header p {
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.receipt-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+}
+
+.receipt-table th {
+  border-bottom: 1px dashed #cccccc;
+  padding-bottom: 8px;
+  text-align: left;
+  font-weight: 700;
+  font-family: var(--font-family);
+  font-size: 14px;
+}
+
+.receipt-table td {
+  padding: 12px 0;
+  border-bottom: 1px dashed #eeeeee;
+}
+
+.receipt-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px dashed #cccccc;
+  padding-top: 16px;
+  font-weight: bold;
+  font-size: 20px;
+  font-family: var(--font-family);
+}
+
 .reportes-total-card {
   display: flex;
   align-items: center;

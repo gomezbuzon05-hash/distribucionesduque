@@ -15,13 +15,18 @@ export const AppProvider = ({ children }) => {
   const [movimientos, setMovimientos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [toast, setToast] = useState(null);
+  const [ordenesMesas, setOrdenesMesas] = useState([]);
 
   // Refs para tener siempre el estado más reciente en las funciones
   // sin necesidad de re-crearlas (evita closures obsoletos)
   const productosRef = useRef(productos);
   const mesasRef = useRef(mesas);
+  const ordenesMesasRef = useRef(ordenesMesas);
+  const usuariosRef = useRef(usuarios);
   useEffect(() => { productosRef.current = productos; }, [productos]);
   useEffect(() => { mesasRef.current = mesas; }, [mesas]);
+  useEffect(() => { ordenesMesasRef.current = ordenesMesas; }, [ordenesMesas]);
+  useEffect(() => { usuariosRef.current = usuarios; }, [usuarios]);
 
   const registrarMovimiento = (accion) => {
     const user = auth.currentUser;
@@ -111,6 +116,14 @@ export const AppProvider = ({ children }) => {
       }, (error) => console.error('onSnapshot usuarios:', error))
     );
 
+    // --- Ordenes Mesas ---
+    unsubscribers.push(
+      onSnapshot(collection(db, 'ordenesMesas'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setOrdenesMesas(data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
+      }, (error) => console.error('onSnapshot ordenesMesas:', error))
+    );
+
     // Cleanup: desuscribirse al desmontar el componente
     return () => {
       unsubscribers.forEach(unsub => unsub());
@@ -126,6 +139,38 @@ export const AppProvider = ({ children }) => {
   //  Las escrituras paralelas (Promise.all) se usan donde hay
   //  múltiples documentos que actualizar.
   // ═══════════════════════════════════════════════════════════════════
+
+  const sumarACajaUsuario = async (monto) => {
+    if (monto <= 0) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    
+    const userDoc = usuariosRef.current.find(u => u.uid === currentUser.uid);
+    if (userDoc) {
+      const nuevaCaja = (userDoc.caja || 0) + monto;
+      // UI Optimista
+      setUsuarios(prev => prev.map(u => u.id === userDoc.id ? { ...u, caja: nuevaCaja } : u));
+      // Firestore
+      updateDocument('usuarios', userDoc.id, { caja: nuevaCaja }).catch(console.error);
+    }
+  };
+
+  const recaudarCajaUsuario = async (usuarioId, monto) => {
+    const userDoc = usuariosRef.current.find(u => u.id === usuarioId);
+    if (!userDoc || monto <= 0) return;
+
+    const nuevaCaja = Math.max(0, (userDoc.caja || 0) - monto);
+    try {
+      // UI Optimista
+      setUsuarios(prev => prev.map(u => u.id === usuarioId ? { ...u, caja: nuevaCaja } : u));
+      await updateDocument('usuarios', usuarioId, { caja: nuevaCaja });
+      mostrarToast(`Recaudación exitosa de $${monto.toLocaleString()}`, 'success');
+      registrarMovimiento(`Recaudó $${monto.toLocaleString()} de la caja de ${userDoc.nombre}`);
+    } catch(e) {
+      console.error(e);
+      mostrarToast('Error al recaudar', 'error');
+    }
+  };
 
   const actualizarRolUsuario = async (userId, nuevoRol, nuevoEstado) => {
     try {
@@ -212,10 +257,14 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const abonarMesa = (mesaId, monto) => {
+  const abonarMesa = (mesaId, monto, metodoPago = 'Efectivo') => {
     const mesa = mesasRef.current.find(m => m.id === mesaId);
     if (!mesa) return;
     const nuevoAbono = (mesa.abonos || 0) + monto;
+
+    if (metodoPago === 'Efectivo') {
+      sumarACajaUsuario(monto);
+    }
 
     // ⚡ UI Optimista
     setMesas(prev => prev.map(m => m.id === mesaId ? { ...m, abonos: nuevoAbono } : m));
@@ -354,7 +403,14 @@ export const AppProvider = ({ children }) => {
     // 🔥 Fire-and-forget EN PARALELO
     Promise.all(promesasCierre).catch(console.error);
 
-    registrarMovimiento(`Cerró la mesa ${mesa.numero}`);
+    if (metodoPago === 'Efectivo' && total > 0) {
+      const totalRecibido = total - (mesa.abonos || 0);
+      if (totalRecibido > 0) {
+        sumarACajaUsuario(totalRecibido);
+      }
+    }
+
+    registrarMovimiento(`Cerró la mesa ${mesa.numero} por un total de $${total.toLocaleString()}`);
   };
 
   const unirMesas = (mesaPrincipalId, mesasSecundariasIds) => {
@@ -478,8 +534,98 @@ export const AppProvider = ({ children }) => {
       updateDocument('mesas', mesaId, { productos: productosFinales })
     ]).catch(console.error);
 
+    if (metodoPago === 'Efectivo' && totalParcial > 0) {
+      sumarACajaUsuario(totalParcial);
+    }
+
     registrarMovimiento(`Cobro parcial en mesa ${mesa.numero} por $${totalParcial}`);
     mostrarToast(`Cobro parcial exitoso: $${totalParcial.toLocaleString()}`, 'success');
+  };
+
+  // ── Ordenes Mesas ────────────────────────────────────────────────────────
+  const crearOrdenMesa = async (mesaId, numeroMesa, carrito) => {
+    const user = auth.currentUser;
+    const nombreUsuario = user?.displayName || user?.email || 'Usuario';
+    
+    const nuevaOrden = {
+      mesaId,
+      numeroMesa,
+      usuario: nombreUsuario,
+      productos: carrito,
+      estado: 'pendiente',
+      fecha: new Date().toISOString()
+    };
+
+    try {
+      await addDocument('ordenesMesas', nuevaOrden);
+      mostrarToast('Orden enviada. Esperando confirmación.', 'success');
+      const totalOrden = carrito.reduce((acc, p) => acc + (p.precio * p.cantidad), 0);
+      registrarMovimiento(`Envió orden de $${totalOrden.toLocaleString()} para la mesa ${numeroMesa}`);
+    } catch(e) {
+      console.error(e);
+      mostrarToast('Error al enviar la orden', 'error');
+    }
+  };
+
+  const confirmarOrdenMesa = async (ordenId) => {
+    const orden = ordenesMesasRef.current.find(o => o.id === ordenId);
+    if (!orden) return;
+
+    const mesaActual = mesasRef.current.find(m => m.id === orden.mesaId);
+    if (!mesaActual) {
+      mostrarToast('La mesa de esta orden ya no existe.', 'error');
+      return;
+    }
+
+    const promesas = [];
+    let hayErrorStock = false;
+    let nuevosProductosLocal = [...productosRef.current];
+    const nuevosProdsMesa = [...mesaActual.productos];
+
+    for (const item of orden.productos) {
+      const prodActualIdx = nuevosProductosLocal.findIndex(p => p.id === item.productoId);
+      if (prodActualIdx >= 0) {
+        const prodActual = nuevosProductosLocal[prodActualIdx];
+        if (prodActual.stock >= item.cantidad) {
+          const nuevoStock = prodActual.stock - item.cantidad;
+          nuevosProductosLocal[prodActualIdx] = { ...prodActual, stock: nuevoStock };
+          promesas.push(updateDocument('productos', item.productoId, { stock: nuevoStock }));
+          
+          const prodMesaIdx = nuevosProdsMesa.findIndex(p => p.productoId === item.productoId);
+          if (prodMesaIdx >= 0) {
+            nuevosProdsMesa[prodMesaIdx] = { ...nuevosProdsMesa[prodMesaIdx], cantidad: nuevosProdsMesa[prodMesaIdx].cantidad + item.cantidad };
+          } else {
+            nuevosProdsMesa.push({ productoId: item.productoId, cantidad: item.cantidad });
+          }
+        } else {
+           hayErrorStock = true;
+           mostrarToast(`No hay stock suficiente de ${item.nombre}`, 'error');
+        }
+      }
+    }
+
+    if (hayErrorStock) {
+      return; // Stop if there's no stock for any item.
+    }
+
+    setProductos(nuevosProductosLocal);
+    setMesas(prev => prev.map(m => m.id === orden.mesaId ? { ...m, productos: nuevosProdsMesa } : m));
+    setOrdenesMesas(prev => prev.map(o => o.id === ordenId ? { ...o, estado: 'entregada' } : o));
+
+    promesas.push(updateDocument('mesas', orden.mesaId, { productos: nuevosProdsMesa }));
+    promesas.push(updateDocument('ordenesMesas', ordenId, { estado: 'entregada' }));
+
+    Promise.all(promesas).catch(console.error);
+    registrarMovimiento(`Confirmó orden de mesa ${orden.numeroMesa}`);
+    mostrarToast('Orden confirmada y agregada a la mesa', 'success');
+  };
+
+  const rechazarOrdenMesa = async (ordenId) => {
+    try {
+      await updateDocument('ordenesMesas', ordenId, { estado: 'rechazada' });
+      mostrarToast('Orden rechazada', 'info');
+      registrarMovimiento('Rechazó una orden de mesa');
+    } catch(e) { console.error(e); }
   };
 
   // ── Pedidos ────────────────────────────────────────────────────────
@@ -546,9 +692,10 @@ export const AppProvider = ({ children }) => {
       mesas, agregarMesa, abrirMesa, abonarMesa, agregarProductoAMesa, actualizarCantidadProductoMesa, cerrarMesa,
       unirMesas, desvincularMesa, cobrarParcialMesa,
       mesasCerradas,
+      ordenesMesas, crearOrdenMesa, confirmarOrdenMesa, rechazarOrdenMesa,
       pedidos, agregarPedido, editarPedido, eliminarPedido,
       movimientos,
-      usuarios, actualizarRolUsuario
+      usuarios, actualizarRolUsuario, recaudarCajaUsuario
     }}>
       {children}
       {toast && (

@@ -1,13 +1,13 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
-import { Plus, X, Search, Minus, Armchair, CheckCircle, User, Link2, SplitSquareHorizontal } from 'lucide-react';
+import { Plus, X, Search, Minus, Armchair, CheckCircle, User, Link2, SplitSquareHorizontal, ShoppingCart } from 'lucide-react';
 import PageTransition from '../components/PageTransition';
 
 const Mesas = () => {
   const { 
     mesas, agregarMesa, abrirMesa, abonarMesa, productos, 
     agregarProductoAMesa, actualizarCantidadProductoMesa, cerrarMesa,
-    unirMesas, desvincularMesa, cobrarParcialMesa
+    unirMesas, desvincularMesa, cobrarParcialMesa, crearOrdenMesa
   } = useContext(AppContext);
   
   const [filtro, setFiltro] = useState('todas');
@@ -22,6 +22,8 @@ const Mesas = () => {
   const [montoAbono, setMontoAbono] = useState('');
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [isConfirmCloseModalOpen, setIsConfirmCloseModalOpen] = useState(false);
+  const [isOrdenarModalOpen, setIsOrdenarModalOpen] = useState(false);
+  const [carritoOrden, setCarritoOrden] = useState([]);
 
   // Unir Mesas
   const [isUnirModalOpen, setIsUnirModalOpen] = useState(false);
@@ -88,7 +90,7 @@ const Mesas = () => {
     e.preventDefault();
     const monto = parseFloat(montoAbono);
     if (monto > 0) {
-      abonarMesa(mesaSeleccionada.id, monto);
+      abonarMesa(mesaSeleccionada.id, monto, metodoPago);
       setMontoAbono('');
     }
   };
@@ -246,41 +248,18 @@ const Mesas = () => {
             ) : (
               <div className="mesa-details-grid">
                 <div>
-                  <div className="product-search">
-                    <Search className="search-icon" size={18} />
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="Buscar producto..."
-                      value={busquedaProducto}
-                      onChange={e => setBusquedaProducto(e.target.value)}
-                    />
-                    {busquedaProducto && (
-                      <div className="search-results">
-                        {productosFiltrados.length > 0 ? (
-                          productosFiltrados.map(prod => (
-                            <div 
-                              key={prod.id} 
-                              className="search-item"
-                              onClick={() => {
-                                agregarProductoAMesa(mesaSeleccionada.id, prod);
-                                // El estado se actualiza automáticamente desde el Contexto
-                                setBusquedaProducto('');
-                              }}
-                            >
-                              <div>
-                                <div style={{ fontWeight: 500 }}>{prod.nombre}</div>
-                                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>${prod.precio} - Stock: {prod.stock}</div>
-                              </div>
-                              <Plus size={18} color="var(--primary)" />
-                            </div>
-                          ))
-                        ) : (
-                          <div className="search-item" style={{ color: 'var(--text-muted)' }}>No se encontraron productos.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <button 
+                    className="btn-primary" 
+                    style={{ width: '100%', marginBottom: '16px', justifyContent: 'center', padding: '12px' }}
+                    onClick={() => {
+                      setCarritoOrden([]);
+                      setBusquedaProducto('');
+                      setIsOrdenarModalOpen(true);
+                    }}
+                  >
+                    <ShoppingCart size={18} />
+                    Ordenar Productos
+                  </button>
 
                   <h3 style={{ marginBottom: 12, fontSize: 16 }}>Consumo Actual</h3>
                   <div className="order-list">
@@ -294,26 +273,8 @@ const Mesas = () => {
                               <div className="order-item-name">{prod.nombre}</div>
                               <div className="order-item-price">${prod.precio} c/u</div>
                             </div>
-                            <div className="qty-control">
-                              <button 
-                                className="qty-btn"
-                                onClick={() => {
-                                  actualizarCantidadProductoMesa(mesaSeleccionada.id, item.productoId, -1);
-                                  // Context update is enough
-                                }}
-                              >
-                                <Minus size={14} />
-                              </button>
-                              <span style={{ width: 20, textAlign: 'center', fontWeight: 600 }}>{item.cantidad}</span>
-                              <button 
-                                className="qty-btn"
-                                onClick={() => {
-                                  actualizarCantidadProductoMesa(mesaSeleccionada.id, item.productoId, 1);
-                                  // Context update is enough
-                                }}
-                              >
-                                <Plus size={14} />
-                              </button>
+                            <div style={{ backgroundColor: 'var(--bg-card)', padding: '4px 12px', borderRadius: '6px', fontWeight: 600, color: 'var(--text-main)' }}>
+                              {item.cantidad} {item.cantidad === 1 ? 'ud' : 'uds'}
                             </div>
                             <div style={{ width: 80, textAlign: 'right', fontWeight: 600 }}>
                               ${(prod.precio * item.cantidad).toLocaleString()}
@@ -579,6 +540,136 @@ const Mesas = () => {
               >
                 Cobrar Selección
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Nueva Orden */}
+      {isOrdenarModalOpen && mesaSeleccionada && (
+        <div className="modal-overlay" style={{ zIndex: 1010 }}>
+          <div className="modal-content large">
+            <div className="modal-header">
+              <div>
+                <h2>Nueva Orden - Mesa {mesaSeleccionada.numero}</h2>
+                <p className="page-subtitle" style={{ marginTop: '4px' }}>Busca y selecciona los productos a pedir.</p>
+              </div>
+              <button className="close-btn" onClick={() => setIsOrdenarModalOpen(false)}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="mesa-details-grid">
+              <div>
+                <div className="product-search">
+                  <Search className="search-icon" size={18} />
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    placeholder="Buscar producto..."
+                    value={busquedaProducto}
+                    onChange={e => setBusquedaProducto(e.target.value)}
+                  />
+                  {busquedaProducto && (
+                    <div className="search-results">
+                      {productosFiltrados.length > 0 ? (
+                        productosFiltrados.map(prod => (
+                          <div 
+                            key={prod.id} 
+                            className="search-item"
+                            onClick={() => {
+                              const existe = carritoOrden.find(p => p.productoId === prod.id);
+                              if (existe) {
+                                setCarritoOrden(carritoOrden.map(p => p.productoId === prod.id ? { ...p, cantidad: p.cantidad + 1 } : p));
+                              } else {
+                                setCarritoOrden([...carritoOrden, { productoId: prod.id, nombre: prod.nombre, precio: prod.precio, cantidad: 1 }]);
+                              }
+                              setBusquedaProducto('');
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 500 }}>{prod.nombre}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>${prod.precio}</div>
+                            </div>
+                            <Plus size={18} color="var(--primary)" />
+                          </div>
+                        ))
+                      ) : (
+                        <div className="search-item" style={{ color: 'var(--text-muted)' }}>No se encontraron productos.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 style={{ marginBottom: 12, fontSize: 16 }}>Resumen de Orden</h3>
+                <div className="order-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  {carritoOrden.length > 0 ? (
+                    carritoOrden.map((item) => (
+                      <div key={item.productoId} className="order-item">
+                        <div className="order-item-info">
+                          <div className="order-item-name">{item.nombre}</div>
+                          <div className="order-item-price">${item.precio} c/u</div>
+                        </div>
+                        <div className="qty-control">
+                          <button 
+                            type="button"
+                            className="qty-btn"
+                            onClick={() => {
+                              if (item.cantidad > 1) {
+                                setCarritoOrden(carritoOrden.map(p => p.productoId === item.productoId ? { ...p, cantidad: p.cantidad - 1 } : p));
+                              } else {
+                                setCarritoOrden(carritoOrden.filter(p => p.productoId !== item.productoId));
+                              }
+                            }}
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span style={{ width: 20, textAlign: 'center', fontWeight: 600 }}>{item.cantidad}</span>
+                          <button 
+                            type="button"
+                            className="qty-btn"
+                            onClick={() => {
+                              setCarritoOrden(carritoOrden.map(p => p.productoId === item.productoId ? { ...p, cantidad: p.cantidad + 1 } : p));
+                            }}
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                        <div style={{ width: 80, textAlign: 'right', fontWeight: 600 }}>
+                          ${(item.precio * item.cantidad).toLocaleString()}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0' }}>
+                      Agrega productos a la orden.
+                    </div>
+                  )}
+                </div>
+                
+                {carritoOrden.length > 0 && (
+                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold' }}>
+                      <span>Total Orden:</span>
+                      <span style={{ color: 'var(--primary)' }}>
+                        ${carritoOrden.reduce((acc, item) => acc + (item.precio * item.cantidad), 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <button 
+                      className="btn-primary" 
+                      style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: '16px' }}
+                      onClick={() => {
+                        crearOrdenMesa(mesaSeleccionada.id, mesaSeleccionada.numero, carritoOrden);
+                        setIsOrdenarModalOpen(false);
+                        setIsDetailsModalOpen(false);
+                      }}
+                    >
+                      Confirmar y Pedir
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
