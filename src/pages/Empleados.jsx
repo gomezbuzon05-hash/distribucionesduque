@@ -1,13 +1,14 @@
 
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
-import { User, Check, X, ShieldAlert, ShieldCheck, UserCog, Lock } from 'lucide-react';
+import { auth } from '../firebase/firebase';
+import { User, Check, X, ShieldAlert, ShieldCheck, UserCog, Lock, Trash2 } from 'lucide-react';
 import PageTransition from '../components/PageTransition';
 
 const CODIGO_VERIFICACION = '7415';
 
 const Empleados = () => {
-  const { usuarios, actualizarRolUsuario } = useContext(AppContext);
+  const { usuarios, actualizarRolUsuario, eliminarUsuario } = useContext(AppContext);
   const [autenticado, setAutenticado] = useState(false);
   const [codigoInput, setCodigoInput] = useState('');
   const [codigoError, setCodigoError] = useState(false);
@@ -26,6 +27,12 @@ const Empleados = () => {
 
   const handleChangeRol = (id, nuevoRol) => {
     actualizarRolUsuario(id, nuevoRol, 'aprobado');
+  };
+
+  const handleEliminarUsuario = (id) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este usuario del sistema?')) {
+      eliminarUsuario(id);
+    }
   };
 
   const handleVerificar = () => {
@@ -189,7 +196,7 @@ const Empleados = () => {
                   <th style={{ padding: '16px 24px', textAlign: 'left', color: 'var(--text-muted)' }}>Usuario</th>
                   <th style={{ padding: '16px 24px', textAlign: 'left', color: 'var(--text-muted)' }}>Email</th>
                   <th style={{ padding: '16px 24px', textAlign: 'left', color: 'var(--text-muted)' }}>Rol Actual</th>
-                  <th style={{ padding: '16px 24px', textAlign: 'right', color: 'var(--text-muted)' }}>Cambiar Rol</th>
+                  <th style={{ padding: '16px 24px', textAlign: 'right', color: 'var(--text-muted)' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -213,16 +220,28 @@ const Empleados = () => {
                       </span>
                     </td>
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                      <select
-                        className="form-control"
-                        style={{ padding: '6px 10px', fontSize: '13px', width: 'auto', display: 'inline-block' }}
-                        value={usuario.rol}
-                        onChange={(e) => handleChangeRol(usuario.id, e.target.value)}
-                      >
-                        <option value="Usuario">Usuario común</option>
-                        <option value="Administrador">Administrador</option>
-                        <option value="SuperAdministrador">SuperAdministrador</option>
-                      </select>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <select
+                          className="form-control"
+                          style={{ padding: '6px 10px', fontSize: '13px', width: 'auto', display: 'inline-block', margin: 0 }}
+                          value={usuario.rol}
+                          onChange={(e) => handleChangeRol(usuario.id, e.target.value)}
+                        >
+                          <option value="Usuario">Usuario común</option>
+                          <option value="Administrador">Administrador</option>
+                          <option value="SuperAdministrador">SuperAdministrador</option>
+                        </select>
+                        {auth.currentUser?.uid !== usuario.uid && (
+                          <button
+                            className="btn-danger"
+                            style={{ padding: '6px 10px', fontSize: '13px', height: '34px', display: 'flex', alignItems: 'center' }}
+                            onClick={() => handleEliminarUsuario(usuario.id)}
+                            title="Eliminar usuario"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

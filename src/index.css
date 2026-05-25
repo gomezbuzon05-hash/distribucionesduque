@@ -1038,3 +1038,269 @@ body {
     white-space: nowrap;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   BIOMETRIC AUTH MODAL
+   ═══════════════════════════════════════════════════════════════════ */
+
+.biometric-modal {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 32px 24px 24px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  animation: slideUp 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.biometric-modal-header {
+  position: relative;
+  min-height: 24px;
+}
+
+.biometric-modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.biometric-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.biometric-status h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 4px;
+}
+
+.biometric-status p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  max-width: 280px;
+}
+
+/* ── Icon Circle ──────────────────────────────────────────── */
+.biometric-icon-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(255, 170, 0, 0.1);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.4s ease;
+}
+
+.biometric-icon-circle.scanning {
+  animation: bioPulse 1.5s ease-in-out infinite;
+}
+
+.biometric-icon-circle.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  animation: bioSuccess 0.5s ease;
+}
+
+@keyframes bioPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(255, 170, 0, 0.3); 
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 0 18px rgba(255, 170, 0, 0); 
+    transform: scale(1.05);
+  }
+}
+
+@keyframes bioSuccess {
+  0% { transform: scale(0.7); opacity: 0; }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.biometric-scanning-text {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Fallback Button ─────────────────────────────────────── */
+.biometric-fallback-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 10px 16px;
+  margin-top: 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  font-family: var(--font-family);
+}
+
+.biometric-fallback-btn:hover {
+  color: var(--primary);
+  background: rgba(255, 170, 0, 0.08);
+}
+
+/* ── PIN Dots Display ─────────────────────────────────────── */
+.pin-display {
+  display: flex;
+  gap: 16px;
+  margin: 12px 0 8px;
+  padding: 12px;
+}
+
+.pin-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.pin-dot.filled {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+  transform: scale(1.1);
+}
+
+.pin-display.shake {
+  animation: pinShake 0.5s ease;
+}
+
+.pin-display.shake .pin-dot.filled {
+  background: #ff5252;
+  border-color: #ff5252;
+  box-shadow: 0 0 10px rgba(255, 82, 82, 0.3);
+}
+
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(10px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+/* ── Error Message ────────────────────────────────────────── */
+.biometric-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ff5252;
+  font-size: 13px;
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 82, 82, 0.08);
+  border-radius: 8px;
+}
+
+/* ── Numpad ────────────────────────────────────────────────── */
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+  margin: 8px auto 0;
+}
+
+.numpad-btn {
+  width: 100%;
+  aspect-ratio: 1.6 / 1;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-main);
+  font-size: 24px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.numpad-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--primary);
+}
+
+.numpad-btn:active {
+  transform: scale(0.95);
+  background: rgba(255, 170, 0, 0.15);
+  border-color: var(--primary);
+}
+
+.numpad-btn.numpad-del {
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+.numpad-btn.numpad-del:hover {
+  color: #ff5252;
+  border-color: #ff5252;
+}
+
+.numpad-spacer {
+  /* empty cell */
+}
+
+/* ── Responsive for biometric modal ──────────────────────── */
+@media (max-width: 768px) {
+  .biometric-modal {
+    max-width: 100%;
+    width: 95%;
+    margin: 16px;
+    padding: 24px 16px 16px;
+    border-radius: 16px;
+  }
+
+  .numpad {
+    max-width: 260px;
+    gap: 8px;
+  }
+
+  .numpad-btn {
+    font-size: 22px;
+    border-radius: 10px;
+  }
+
+  .biometric-status h3 {
+    font-size: 18px;
+  }
+
+  .biometric-icon-circle {
+    width: 60px;
+    height: 60px;
+  }
+}

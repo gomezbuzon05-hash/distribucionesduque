@@ -2,12 +2,14 @@ import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import { Plus, X, Search, Minus, Armchair, CheckCircle, User, Link2, SplitSquareHorizontal, ShoppingCart } from 'lucide-react';
 import PageTransition from '../components/PageTransition';
+import BiometricAuthModal from '../components/BiometricAuthModal';
 
 const Mesas = () => {
   const { 
     mesas, agregarMesa, abrirMesa, abonarMesa, productos, 
     agregarProductoAMesa, actualizarCantidadProductoMesa, cerrarMesa,
-    unirMesas, desvincularMesa, cobrarParcialMesa, crearOrdenMesa
+    unirMesas, desvincularMesa, cobrarParcialMesa, crearOrdenMesa,
+    obtenerUsuarioActual, guardarCredencialesBiometricasUsuario
   } = useContext(AppContext);
   
   const [filtro, setFiltro] = useState('todas');
@@ -32,6 +34,9 @@ const Mesas = () => {
   // Dividir Cuenta (Por Productos)
   const [isDividirModalOpen, setIsDividirModalOpen] = useState(false);
   const [productosParaCobrar, setProductosParaCobrar] = useState([]);
+
+  // Biometric Auth
+  const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
 
   const mesasFiltradas = mesas.filter(m => {
     if (filtro === 'ocupadas') return m.estado === 'ocupada';
@@ -660,9 +665,7 @@ const Mesas = () => {
                       className="btn-primary" 
                       style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: '16px' }}
                       onClick={() => {
-                        crearOrdenMesa(mesaSeleccionada.id, mesaSeleccionada.numero, carritoOrden);
-                        setIsOrdenarModalOpen(false);
-                        setIsDetailsModalOpen(false);
+                        setIsBiometricModalOpen(true);
                       }}
                     >
                       Confirmar y Pedir
@@ -674,6 +677,19 @@ const Mesas = () => {
           </div>
         </div>
       )}
+      {/* Modal Verificación Biométrica */}
+      <BiometricAuthModal
+        isOpen={isBiometricModalOpen}
+        onClose={() => setIsBiometricModalOpen(false)}
+        onSuccess={() => {
+          setIsBiometricModalOpen(false);
+          crearOrdenMesa(mesaSeleccionada.id, mesaSeleccionada.numero, carritoOrden);
+          setIsOrdenarModalOpen(false);
+          setIsDetailsModalOpen(false);
+        }}
+        currentUser={obtenerUsuarioActual()}
+        onSaveCredentials={guardarCredencialesBiometricasUsuario}
+      />
     </PageTransition>
   );
 };
