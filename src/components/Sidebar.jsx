@@ -1,14 +1,15 @@
 import React, { useState, useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Grid, Package, Tags, FileText, LogOut, Truck, Activity, Menu, X, Users, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Grid, Package, Tags, FileText, LogOut, Truck, Activity, Menu, X, Users, ClipboardList, Wallet } from 'lucide-react';
 import { auth } from '../firebase/firebase';
 import { signOut } from 'firebase/auth';
 import { AppContext } from '../context/AppContext';
 
 const Sidebar = ({ userData }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { ordenesMesas } = useContext(AppContext);
+  const { ordenesMesas, solicitudesCaja } = useContext(AppContext);
   const pendingOrdersCount = ordenesMesas?.filter(o => o.estado === 'pendiente').length || 0;
+  const pendingSolicitudesCount = solicitudesCaja?.filter(s => s.estado === 'pendiente').length || 0;
   const closeSidebar = () => setIsOpen(false);
   const handleLogout = async () => {
     try {
@@ -76,6 +77,15 @@ const Sidebar = ({ userData }) => {
               )}
             </NavLink>
           )}
+          <NavLink to="/caja" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+            <Wallet size={20} />
+            <span style={{ flex: 1 }}>Caja</span>
+            {userData?.rol !== 'Usuario' && pendingSolicitudesCount > 0 && (
+              <span style={{ backgroundColor: '#f97316', color: '#fff', borderRadius: '12px', padding: '2px 8px', fontSize: '12px', fontWeight: 'bold' }}>
+                {pendingSolicitudesCount}
+              </span>
+            )}
+          </NavLink>
           {userData?.rol === 'SuperAdministrador' && (
             <>
               <NavLink to="/pedidos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>

@@ -16,6 +16,7 @@ export const AppProvider = ({ children }) => {
   const [usuarios, setUsuarios] = useState([]);
   const [toast, setToast] = useState(null);
   const [ordenesMesas, setOrdenesMesas] = useState([]);
+  const [solicitudesCaja, setSolicitudesCaja] = useState([]);
 
   // Refs para tener siempre el estado más reciente en las funciones
   // sin necesidad de re-crearlas (evita closures obsoletos)
@@ -23,10 +24,12 @@ export const AppProvider = ({ children }) => {
   const mesasRef = useRef(mesas);
   const ordenesMesasRef = useRef(ordenesMesas);
   const usuariosRef = useRef(usuarios);
+  const solicitudesCajaRef = useRef(solicitudesCaja);
   useEffect(() => { productosRef.current = productos; }, [productos]);
   useEffect(() => { mesasRef.current = mesas; }, [mesas]);
   useEffect(() => { ordenesMesasRef.current = ordenesMesas; }, [ordenesMesas]);
   useEffect(() => { usuariosRef.current = usuarios; }, [usuarios]);
+  useEffect(() => { solicitudesCajaRef.current = solicitudesCaja; }, [solicitudesCaja]);
 
   const registrarMovimiento = (accion) => {
     const user = auth.currentUser;
@@ -122,6 +125,14 @@ export const AppProvider = ({ children }) => {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setOrdenesMesas(data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
       }, (error) => console.error('onSnapshot ordenesMesas:', error))
+    );
+
+    // --- Solicitudes de Caja ---
+    unsubscribers.push(
+      onSnapshot(collection(db, 'solicitudesCaja'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setSolicitudesCaja(data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
+      }, (error) => console.error('onSnapshot solicitudesCaja:', error))
     );
 
     // Cleanup: desuscribirse al desmontar el componente
@@ -292,7 +303,16 @@ export const AppProvider = ({ children }) => {
   };
 
   const abrirMesa = (mesaId, titular) => {
-    const mesaActualizada = { titular, estado: 'ocupada', productos: [], abonos: 0, mesasHijas: [], mesaPadreId: null };
+    const usuarioActualId = auth.currentUser?.uid || null;
+    const mesaActualizada = { 
+      titular, 
+      estado: 'ocupada', 
+      productos: [], 
+      abonos: 0, 
+      mesasHijas: [], 
+      mesaPadreId: null,
+      usuarioAperturaId: usuarioActualId
+    };
     const mesaActual = mesasRef.current.find(m => m.id === mesaId);
 
     // ⚡ UI Optimista — actualización instantánea
@@ -407,6 +427,15 @@ export const AppProvider = ({ children }) => {
   const cerrarMesa = (mesaId, metodoPago = 'Efectivo') => {
     const mesa = mesasRef.current.find(m => m.id === mesaId);
     if (!mesa) return;
+
+    const usuarioActualId = auth.currentUser?.uid;
+    const usuarioInfo = usuariosRef.current.find(u => u.uid === usuarioActualId);
+
+    // Verificación: Solo quien abrió la mesa o un SuperAdmin puede cerrarla
+    if (mesa.usuarioAperturaId && mesa.usuarioAperturaId !== usuarioActualId && usuarioInfo?.rol !== 'SuperAdministrador') {
+      mostrarToast('Error: No puedes cerrar una mesa que abrió otro mesero.', 'error');
+      return;
+    }
 
     let total = 0;
     let cantProductos = 0;
@@ -683,6 +712,67 @@ export const AppProvider = ({ children }) => {
     } catch(e) { console.error(e); }
   };
 
+  // ── Solicitudes de Caja ─────────────────────────────────────────────
+  const crearSolicitudCaja = async (monto) => {
+    if (monto <= 0) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    const userDoc = usuariosRef.current.find(u => u.uid === currentUser.uid);
+    if (!userDoc) return;
+
+    if (monto > (userDoc.caja || 0)) {
+      mostrarToast('El monto no puede ser mayor a tu caja actual', 'error');
+      return;
+    }
+
+    const nuevaSolicitud = {
+      usuarioId: userDoc.id,
+      usuarioNombre: userDoc.nombre,
+      monto,
+      estado: 'pendiente',
+      fecha: new Date().toISOString()
+    };
+
+    try {
+      await addDocument('solicitudesCaja', nuevaSolicitud);
+      mostrarToast(`Solicitud de entrega por $${monto.toLocaleString()} enviada`, 'success');
+      registrarMovimiento(`Envió solicitud de entrega de $${monto.toLocaleString()}`);
+    } catch(e) {
+      console.error(e);
+      mostrarToast('Error al enviar solicitud', 'error');
+    }
+  };
+
+  const confirmarSolicitudCaja = async (solicitudId) => {
+    const solicitud = solicitudesCajaRef.current.find(s => s.id === solicitudId);
+    if (!solicitud || solicitud.estado !== 'pendiente') return;
+
+    const userDoc = usuariosRef.current.find(u => u.id === solicitud.usuarioId);
+    if (!userDoc) {
+      mostrarToast('No se encontró el mesero', 'error');
+      return;
+    }
+
+    const nuevaCaja = Math.max(0, (userDoc.caja || 0) - solicitud.monto);
+
+    try {
+      // UI Optimista
+      setUsuarios(prev => prev.map(u => u.id === solicitud.usuarioId ? { ...u, caja: nuevaCaja } : u));
+      setSolicitudesCaja(prev => prev.map(s => s.id === solicitudId ? { ...s, estado: 'confirmada' } : s));
+
+      await Promise.all([
+        updateDocument('usuarios', solicitud.usuarioId, { caja: nuevaCaja }),
+        updateDocument('solicitudesCaja', solicitudId, { estado: 'confirmada', fechaConfirmacion: new Date().toISOString() })
+      ]);
+
+      mostrarToast(`Recepción confirmada: $${solicitud.monto.toLocaleString()} de ${solicitud.usuarioNombre}`, 'success');
+      registrarMovimiento(`Confirmó recepción de $${solicitud.monto.toLocaleString()} de ${solicitud.usuarioNombre}`);
+    } catch(e) {
+      console.error(e);
+      mostrarToast('Error al confirmar solicitud', 'error');
+    }
+  };
+
   // ── Pedidos ────────────────────────────────────────────────────────
   const agregarPedido = async (pedido) => {
     let pedidoNuevo = { ...pedido, codigo: generarCodigo() };
@@ -751,7 +841,8 @@ export const AppProvider = ({ children }) => {
       pedidos, agregarPedido, editarPedido, eliminarPedido,
       movimientos,
       usuarios, actualizarRolUsuario, recaudarCajaUsuario, eliminarUsuario,
-      obtenerUsuarioActual, guardarCredencialesBiometricasUsuario
+      obtenerUsuarioActual, guardarCredencialesBiometricasUsuario,
+      solicitudesCaja, crearSolicitudCaja, confirmarSolicitudCaja
     }}>
       {children}
       {toast && (

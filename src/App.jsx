@@ -14,6 +14,7 @@ import Pedidos from './pages/Pedidos';
 import Movimientos from './pages/Movimientos';
 import Empleados from './pages/Empleados';
 import Ordenes from './pages/Ordenes';
+import Caja from './pages/Caja';
 import Login from './pages/Login';
 import barBg from './assets/bar_bg.png';
 
@@ -111,6 +112,7 @@ function App() {
               <Route path="categorias" element={<Categorias userData={userData} />} />
               
               {userData.rol !== 'Usuario' && <Route path="ordenes" element={<Ordenes />} />}
+              <Route path="caja" element={<Caja />} />
               {userData.rol === 'SuperAdministrador' && (
                 <>
                   <Route path="pedidos" element={<Pedidos />} />
