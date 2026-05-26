@@ -166,15 +166,15 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const sumarACajaPorId = async (usuarioId, monto) => {
-    if (monto <= 0 || !usuarioId) return;
-    const userDoc = usuariosRef.current.find(u => u.id === usuarioId);
-    if (userDoc) {
-      const nuevaCaja = (userDoc.caja || 0) + monto;
-      setUsuarios(prev => prev.map(u => u.id === userDoc.id ? { ...u, caja: nuevaCaja } : u));
-      updateDocument('usuarios', userDoc.id, { caja: nuevaCaja }).catch(console.error);
-    }
-  };
+  // const sumarACajaPorId = async (usuarioId, monto) => {
+  //   if (monto <= 0 || !usuarioId) return;
+  //   const userDoc = usuariosRef.current.find(u => u.id === usuarioId);
+  //   if (userDoc) {
+  //     const nuevaCaja = (userDoc.caja || 0) + monto;
+  //     setUsuarios(prev => prev.map(u => u.id === userDoc.id ? { ...u, caja: nuevaCaja } : u));
+  //     updateDocument('usuarios', userDoc.id, { caja: nuevaCaja }).catch(console.error);
+  //   }
+  // };
 
   const recaudarCajaUsuario = async (usuarioId, monto) => {
     const userDoc = usuariosRef.current.find(u => u.id === usuarioId);
@@ -694,10 +694,6 @@ export const AppProvider = ({ children }) => {
     promesas.push(updateDocument('mesas', orden.mesaId, { productos: nuevosProdsMesa }));
     promesas.push(updateDocument('ordenesMesas', ordenId, { estado: 'entregada' }));
 
-    if (orden.usuarioId) {
-      const totalOrden = orden.productos.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
-      sumarACajaPorId(orden.usuarioId, totalOrden);
-    }
 
     Promise.all(promesas).catch(console.error);
     registrarMovimiento(`Confirmó orden de mesa ${orden.numeroMesa}`);
